@@ -135,11 +135,9 @@
             <button class="filter-btn active" data-layer="all">
               All Layers
             </button>
-            <button class="filter-btn" data-layer="placement">Placement</button>
-            <button class="filter-btn" data-layer="layering">Layering</button>
-            <button class="filter-btn" data-layer="integration">
-              Integration
-            </button>
+            <button class="filter-btn filter-check active" data-layer="placement">Placement</button>
+            <button class="filter-btn filter-check active" data-layer="layering">Layering</button>
+            <button class="filter-btn filter-check active" data-layer="integration">Integration</button>
           </div>
         </div>
 
@@ -1171,8 +1169,6 @@
       // ═══════════════════════════════════════════════════════════════
       function showDetail(d) {
         const panel = document.getElementById('detail-panel');
-        document.getElementById('right-panel-title').textContent =
-          'Entity Detail';
         const relatedLinks = LINKS.filter(
           (l) =>
             (l.source.id || l.source) === d.id ||
@@ -1584,15 +1580,28 @@
       // ═══════════════════════════════════════════════════════════════
       //  Layer filter
       // ═══════════════════════════════════════════════════════════════
-      let activeLayer = 'all';
+      const ALL_LAYERS = new Set(['placement', 'layering', 'integration']);
+      let activeLayers = new Set(ALL_LAYERS);
 
       document.querySelectorAll('.filter-btn[data-layer]').forEach((btn) => {
         btn.addEventListener('click', () => {
-          document
-            .querySelectorAll('.filter-btn[data-layer]')
-            .forEach((b) => b.classList.remove('active'));
-          btn.classList.add('active');
-          activeLayer = btn.dataset.layer;
+          const layer = btn.dataset.layer;
+          const allBtn = document.querySelector('.filter-btn[data-layer="all"]');
+          const checkBtns = document.querySelectorAll('.filter-check[data-layer]');
+          if (layer === 'all') {
+            activeLayers = new Set(ALL_LAYERS);
+            checkBtns.forEach((b) => b.classList.add('active'));
+            allBtn.classList.add('active');
+          } else {
+            if (activeLayers.has(layer)) {
+              activeLayers.delete(layer);
+              btn.classList.remove('active');
+            } else {
+              activeLayers.add(layer);
+              btn.classList.add('active');
+            }
+            allBtn.classList.toggle('active', activeLayers.size === ALL_LAYERS.size);
+          }
           applyFilters();
         });
       });
@@ -1637,12 +1646,13 @@
       function applyFilters() {
         const cutoff = getDateCutoff();
 
+        const allActive = activeLayers.size === ALL_LAYERS.size;
         const visibleLinks = LINKS.filter((l) => {
           if (l.date > cutoff) return false;
-          if (activeLayer === 'all') return true;
+          if (allActive) return true;
           const s = NODES.find((n) => n.id === (l.source.id || l.source));
           const t = NODES.find((n) => n.id === (l.target.id || l.target));
-          return s?.layer === activeLayer || t?.layer === activeLayer;
+          return s && t && activeLayers.has(s.layer) && activeLayers.has(t.layer);
         });
 
         const visibleNodeIds = new Set(
@@ -1651,10 +1661,10 @@
             l.target.id || l.target,
           ]),
         );
-        if (activeLayer === 'all') {
+        if (allActive) {
           NODES.forEach((n) => visibleNodeIds.add(n.id));
         } else {
-          NODES.filter((n) => n.layer === activeLayer).forEach((n) =>
+          NODES.filter((n) => activeLayers.has(n.layer)).forEach((n) =>
             visibleNodeIds.add(n.id),
           );
         }

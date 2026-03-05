@@ -332,6 +332,9 @@ header.disrupt-active {
 .filter-btn:hover  { border-color: var(--interactive-border-hover); color: var(--interactive-fg-hover); }
 .filter-btn.active { background: var(--interactive-bg-selected); border-color: var(--interactive-border-hover); color: var(--interactive-fg-hover); }
 
+.filter-check::before        { content: '□'; margin-right: 7px; font-size: 11px; opacity: 0.5; }
+.filter-check.active::before { content: '■'; opacity: 1; }
+
 /* ── Timeline ── */
 .timeline-wrap {
   display: flex;
