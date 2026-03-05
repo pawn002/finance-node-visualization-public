@@ -1332,12 +1332,35 @@
       // ═══════════════════════════════════════════════════════════════
       //  Disruption simulator
       // ═══════════════════════════════════════════════════════════════
+      function computeStarvedNodes() {
+        const dead = new Set(frozenNodes);
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const node of NODES) {
+            if (dead.has(node.id)) continue;
+            const inLinks = LINKS.filter(
+              (l) => (l.target.id || l.target) === node.id,
+            );
+            if (inLinks.length === 0) continue; // source nodes can't be starved
+            if (inLinks.every((l) => dead.has(l.source.id || l.source))) {
+              dead.add(node.id);
+              changed = true;
+            }
+          }
+        }
+        return new Set([...dead].filter((id) => !frozenNodes.has(id)));
+      }
+
       function getActiveReroutes() {
+        const starvedNodes = computeStarvedNodes();
         return REROUTE_LINKS.filter(
           (r) =>
             frozenNodes.has(r.triggerNode) &&
             !frozenNodes.has(r.source) &&
-            !frozenNodes.has(r.target),
+            !frozenNodes.has(r.target) &&
+            !starvedNodes.has(r.source) &&
+            !starvedNodes.has(r.target),
         );
       }
 
@@ -1374,11 +1397,21 @@
           .select('.anomaly-ring')
           .style('opacity', (d) => (frozenNodes.has(d.id) ? 0 : null));
 
+        // ── Hide edge amount labels (misleading during simulation) ──────
+        linkLabelGroup.style('display', 'none');
+
+        // ── Starved nodes (cascade from frozen) ───────────────────────
+        const starvedNodes = computeStarvedNodes();
+        nodeEls.style('opacity', (d) => (starvedNodes.has(d.id) ? 0.2 : null));
+
         // ── Edge visuals ──────────────────────────────────────────────
         linkEls.classed('blocked', (d) => {
           const srcId = d.source.id || d.source;
           const tgtId = d.target.id || d.target;
-          return frozenNodes.has(srcId) || frozenNodes.has(tgtId);
+          return (
+            frozenNodes.has(srcId) || frozenNodes.has(tgtId) ||
+            starvedNodes.has(srcId) || starvedNodes.has(tgtId)
+          );
         });
 
         // ── Ghost reroute edges ───────────────────────────────────────
@@ -1523,6 +1556,8 @@
           .attr('fill', (d) => NODE_COLOR[d.type])
           .attr('stroke', (d) => NODE_STROKE[d.type])
           .attr('opacity', 1);
+        nodeEls.style('opacity', null);
+        linkLabelGroup.style('display', null);
         nodeEls.select('.node-country').style('display', null);
         nodeEls.select('.node-lock').style('display', 'none');
         nodeEls.select('.anomaly-ring').style('opacity', null);
@@ -1552,6 +1587,7 @@
           applyPredictions(); // clears pred edges since disruptMode=true check is in applyPredictions
           document.getElementById('predictions-toggle').disabled = true;
           document.getElementById('legend-prediction').style.display = 'none';
+          linkLabelGroup.style('display', 'none');
           showDisruptionPanel();
         } else {
           btn.textContent = '⚡ Simulate Disruption';
